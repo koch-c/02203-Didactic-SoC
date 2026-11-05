@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module edge_detector_top #(
+module sobel_datapath #(
     parameter int IMG_W = 352,
     parameter int IMG_H = 288
 )(
