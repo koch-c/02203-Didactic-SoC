@@ -70,6 +70,9 @@ module pixel_acc #(
   logic [6:0] count;
   logic       count_reset;
 
+  assign ibuf_rd_addr = rd_addr;
+  assign obuf_wr_addr = wr_addr;
+
   always_comb begin
     // default values
     state_next   = state;
@@ -105,7 +108,7 @@ module pixel_acc #(
         if (wr_addr == BUF_DEPTH - IMG_WIDTH - 2) begin // to second last row and second last column of the output
           state_next = FINISH;
         end else begin
-          if (rd_addr == BUF_DEPTH) begin
+          if (rd_addr == BUF_DEPTH - 1) begin
             rd_addr_next = 0;
           end
           if (count == IMG_WIDTH - 3) begin  // equivalent to 85
@@ -120,7 +123,7 @@ module pixel_acc #(
         if (count == 1) begin
           count_reset  = 1'b1;
           state_next   = COMPUTE;
-          wr_addr_next = wr_addr + BUF_AW'(3);  // skip the first column of the output
+          wr_addr_next = wr_addr + BUF_AW'(2);  // skip the first column of the output
         end
       end
       FINISH: begin
