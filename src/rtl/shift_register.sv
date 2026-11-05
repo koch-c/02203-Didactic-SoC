@@ -7,6 +7,7 @@ module shift_register #(
 )(
     input  logic                     clk,
     input  logic                     rst_n,
+    input  logic                     clear,
     input  logic                     en,
     input  logic [WORD_W-1:0]        in,          // whole new word in
     output logic [DEPTH*WORD_W-1:0]  out         // word k = out[k*WORD_W +: WORD_W]
@@ -14,6 +15,8 @@ module shift_register #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
+            out <= '0;
+        else if (clear)
             out <= '0;
         else if (en)
             out <= {in, out[DEPTH*WORD_W-1 : WORD_W]};  // new word enters at top, word 0 falls out

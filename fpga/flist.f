@@ -264,6 +264,9 @@
 ../src/rtl/kth_ss_tieoff.sv
 ../src/rtl/tum_ss_tieoff.sv
 ../src/rtl/Student_area_0.sv
+../src/rtl/shift_register.sv
+../src/rtl/sobel_arith.sv
+../src/rtl/sobel_datapath.sv
 ../src/rtl/student_ss_1.sv
 ../src/rtl/Student_SS_2.sv
 ../src/rtl/Student_SS_3.sv
@@ -277,4 +280,3 @@
 ../src/generated/SysCtrl_SS_0.v
 ../src/generated/SysCtrl_SS_wrapper_0.v
 ../src/generated/Didactic.v
-

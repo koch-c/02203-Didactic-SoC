@@ -70,6 +70,7 @@ INCLUDES_F = includes.f
 ACC_LANG ?= sv
 ifeq ($(ACC_LANG),sv)
 PIXEL_ACC_SV  = ../src/rtl/pixel_acc.sv
+PIXEL_ACC_DEPS = ../src/rtl/shift_register.sv ../src/rtl/sobel_arith.sv ../src/rtl/sobel_datapath.sv
 WAVE_SS       = wave_ss.do
 else ifeq ($(ACC_LANG),vhdl)
 PIXEL_ACC_SV  = ../src/rtl/pixel_acc_vhd_wrapper.sv
@@ -180,7 +181,7 @@ run_sim: library_mapping
 #============================================================
 
 SS_TB = tb_student_ss
-SS_TB_SRC = ../src/tb/tb_student_ss.sv ../src/rtl/Student_area_0.sv $(PIXEL_ACC_SV)
+SS_TB_SRC = ../src/tb/tb_student_ss.sv ../src/rtl/Student_area_0.sv $(PIXEL_ACC_DEPS) $(PIXEL_ACC_SV)
 
 compile_ss:
 	vlib $(BUILD_DIR)/didactic_lib

@@ -5,6 +5,7 @@ module sobel_datapath #(
     parameter int IMG_H = 288
 )(
     input  logic        rst_n,
+    input  logic        clear,
     input  logic        clk,
     input  logic        en,
     input  logic [31:0] in,
@@ -31,6 +32,7 @@ module sobel_datapath #(
     ) u_shift (
         .clk(clk),
         .rst_n(rst_n),
+        .clear(clear),
         .en(en),
         .in(in),
         .out(history)
@@ -118,6 +120,12 @@ module sobel_datapath #(
     always_ff @(posedge clk or negedge rst_n) begin
 
         if (!rst_n) begin
+            fill_count <= '0;
+            center_col <= '0;
+            center_row <= ROW_W'(1);
+        end
+
+        else if (clear) begin
             fill_count <= '0;
             center_col <= '0;
             center_row <= ROW_W'(1);

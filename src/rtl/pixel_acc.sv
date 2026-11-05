@@ -46,85 +46,114 @@ module pixel_acc #(
 );
 
   // ============================================================
-  // BRAM has 1-cycle read latency, so:
-  //   cycle 0: read ibuf[0] issued  (rd_data not yet valid)
-  //   cycle 1: read ibuf[1] issued, ibuf[0] data valid -> write obuf[0]
-  //   ...
-  //   cycle N: read ibuf[N] issued (last), write obuf[N-1]
-  //   cycle N+1: no new read, write obuf[N], assert finish
-  //
+  // BRAM data is consumed one cycle after each read request.
+  // The datapath registers that data into its window, so write requests
+  // and addresses are delayed one cycle to match the resulting Sobel data.
+  // COMPUTE_LAST drains the final write before FINISH is asserted.
   // ============================================================
 
+  localparam int COUNT_W = (IMG_WIDTH > 1) ? $clog2(IMG_WIDTH) : 1;
+
   typedef enum logic [2:0] {
-    IDLE     = 3'b000,
-    LOAD     = 3'b001,
-    COMPUTE  = 3'b010,
-    NEXT_ROW = 3'b011,
-    FINISH   = 3'b100
+    IDLE         = 3'b000,
+    LOAD         = 3'b001,
+    COMPUTE      = 3'b010,
+    NEXT_ROW     = 3'b011,
+    COMPUTE_LAST = 3'b100,
+    FINISH       = 3'b101
   } state_t;
 
   state_t state;
   state_t state_next;
   logic [BUF_AW-1:0] rd_addr, rd_addr_next;
   logic [BUF_AW-1:0] wr_addr, wr_addr_next;
-  logic [6:0] count;
+  logic [COUNT_W-1:0] count;
   logic       count_reset;
+  logic       ibuf_data_valid;
+  logic       write_request;
+  logic       datapath_clear;
 
   assign ibuf_rd_addr = rd_addr;
-  assign obuf_wr_addr = wr_addr;
+  assign datapath_clear = (state == IDLE) && start;
+
+  sobel_datapath #(
+      .IMG_W(IMG_WIDTH * 4),
+      .IMG_H(BUF_DEPTH / IMG_WIDTH)
+  ) u_sobel_datapath (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clear(datapath_clear),
+      .en(ibuf_data_valid),
+      .in(ibuf_rd_data),
+      .out(obuf_wr_data)
+  );
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      ibuf_data_valid <= 1'b0;
+      obuf_wr_en      <= 1'b0;
+      obuf_wr_addr    <= '0;
+    end else if (datapath_clear) begin
+      ibuf_data_valid <= 1'b0;
+      obuf_wr_en      <= 1'b0;
+      obuf_wr_addr    <= '0;
+    end else begin
+      ibuf_data_valid <= ibuf_rd_en;
+      obuf_wr_en      <= write_request;
+      if (write_request) obuf_wr_addr <= wr_addr;
+    end
+  end
 
   always_comb begin
     // default values
-    state_next   = state;
-    rd_addr_next = rd_addr;
-    wr_addr_next = wr_addr;
-    ibuf_rd_en   = 1'b0;
-    obuf_wr_en   = 1'b0;
-    // obuf_wr_data = '0; <---------- this has to be connected to the computer
-    finish       = 1'b0;
-    count_reset  = 1'b0;
+    state_next    = state;
+    rd_addr_next  = rd_addr;
+    wr_addr_next  = wr_addr;
+    ibuf_rd_en    = 1'b0;
+    write_request = 1'b0;
+    finish        = 1'b0;
+    count_reset   = 1'b0;
 
     case (state)
       IDLE: begin
         if (start) begin
           state_next   = LOAD;
           rd_addr_next = '0;
-          wr_addr_next = IMG_WIDTH + 1;  // skip the first row and first column of the output
+          wr_addr_next = BUF_AW'(IMG_WIDTH + 1);  // skip the first row and first word column
+          count_reset  = 1'b1;
         end
       end
       LOAD: begin
-        ibuf_rd_en   = 1'b1;
-        rd_addr_next = rd_addr + 1'b1;
-        if (rd_addr == IMG_WIDTH * 2 + 2) begin  // I think it is
+        ibuf_rd_en = 1'b1;
+        if (rd_addr == BUF_AW'(IMG_WIDTH * 2 + 2)) begin
           count_reset = 1'b1;
           state_next  = COMPUTE;
         end
       end
       COMPUTE: begin
-        ibuf_rd_en   = 1'b1;
-        obuf_wr_en   = 1'b1;
-        rd_addr_next = rd_addr + 1'b1;
-        wr_addr_next = wr_addr + 1'b1;
-        if (wr_addr == BUF_DEPTH - IMG_WIDTH - 2) begin // to second last row and second last column of the output
-          state_next = FINISH;
+        ibuf_rd_en    = 1'b1;
+        write_request = 1'b1;
+        wr_addr_next  = wr_addr + 1'b1;
+        if (wr_addr == BUF_AW'(BUF_DEPTH - IMG_WIDTH - 2)) begin
+          state_next = COMPUTE_LAST;
         end else begin
-          if (rd_addr == BUF_DEPTH - 1) begin
-            rd_addr_next = 0;
-          end
-          if (count == IMG_WIDTH - 3) begin  // equivalent to 85
+          if (count == COUNT_W'(IMG_WIDTH - 3)) begin  // 86 writes: counts 0 through 85
             count_reset = 1'b1;
             state_next  = NEXT_ROW;
           end
         end
       end
       NEXT_ROW: begin
-        ibuf_rd_en   = 1'b1;
-        rd_addr_next = rd_addr + 1'b1;
+        ibuf_rd_en = 1'b1;
         if (count == 1) begin
           count_reset  = 1'b1;
           state_next   = COMPUTE;
-          wr_addr_next = wr_addr + BUF_AW'(2);  // skip the first column of the output
+          wr_addr_next = wr_addr + BUF_AW'(2);  // skip the right and next left word borders
         end
+      end
+      COMPUTE_LAST: begin
+        // The registered write enable commits the final output on this edge.
+        state_next = FINISH;
       end
       FINISH: begin
         finish = 1'b1;
@@ -134,6 +163,12 @@ module pixel_acc #(
         // Should not happen
       end
     endcase
+
+    // All reading states share the same sequential, wrapping address stream.
+    if (ibuf_rd_en) begin
+      if (rd_addr == BUF_AW'(BUF_DEPTH - 1)) rd_addr_next = '0;
+      else rd_addr_next = rd_addr + 1'b1;
+    end
   end
 
   always_ff @(posedge clk or negedge rst_n) begin
@@ -149,9 +184,9 @@ module pixel_acc #(
   end
 
   always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) count <= 7'd0;
-    else if (count_reset) count <= 7'd0;
-    else count <= count + 7'd1;
+    if (!rst_n) count <= '0;
+    else if (count_reset) count <= '0;
+    else count <= count + 1'b1;
   end
 
 

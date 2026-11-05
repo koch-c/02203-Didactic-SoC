@@ -288,6 +288,9 @@
 ../src/rtl/kth_ss_tieoff.sv
 ../src/rtl/tum_ss_tieoff.sv
 ../src/rtl/Student_area_0.sv
+../src/rtl/shift_register.sv
+../src/rtl/sobel_arith.sv
+../src/rtl/sobel_datapath.sv
 ../src/rtl/student_ss_1.sv
 ../src/rtl/Student_SS_2.sv
 ../src/rtl/Student_SS_3.sv
@@ -307,4 +310,3 @@
 ../src/tb/spi/if_spi_slave.sv
 ../src/tb/jtag/jtag_pkg.sv
 ../src/tb/tb_didactic_V1.sv
-
