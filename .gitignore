@@ -1,6 +1,5 @@
 build/
-obj_dir/
-logs/
+obj_dir/ logs/
 *.wlf
 modelsim.ini
 transcript
@@ -18,3 +17,5 @@ Bender.lock
 src/tb/out_images/*
 fpga/serial_interface/.venv
 fpga/dfx_runtime.txt
+
+.DS_Store
