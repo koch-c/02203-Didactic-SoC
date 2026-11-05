@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+
 //////////////////////////////////////////////////////////////////////////////////
 // Course : 02203 Design of Digital Systems
 // Group : 3
@@ -40,24 +41,32 @@ module sobel_arith(
     assign p32 = $signed({3'b000, s32});
     assign p33 = $signed({3'b000, s33});
     
-    logic [20:0] x, t, scaled;
+    // logic [20:0] x, t, scaled;
     
     always_comb begin
         dx = p13 - p11 + ((p23 - p21) << 1) + p33 - p31;
         dy = p11 - p31 + ((p12 - p32) << 1) + p13 - p33;
+        
+        /*dx = p13 - p11 + ((p23 - p21) << 1) + p33 - p31;
+        dy = p11 - p31 + ((p12 - p32) << 1) + p13 - p33;*/
     
         abs_d = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy); // abs(d) = abs(dx) + abs(dy)
     
-        // s_out = abs_d / 6; // Scaling
+        s_out = abs_d / 6; // Scaling. Vivado is good at optimizing division by constants.
+        
         // s_out = magnitude > 255 ? 255 : magnitude; // Cap
         
-        x = {10'b0, abs_d};
+        
+        // Below is the "optimized" version of division by six,
+        // but actually uses more LUTs (12 more) and is slower in terms of logic.
+        // It also uses 6 more logic slices (19 vs 12)
+        /*x = {10'b0, abs_d};
 
         t = (x << 3) + (x << 1) + x;  // 11*x
         t = (t << 5) - t;             // 341*x Double check order of bitshifts and subtraction
         scaled = (t << 1) + x;        // 683*x
     
-        s_out = scaled[19:12];        // x / 6
+        s_out = scaled[19:12];*/        // x / 6
     end
     
 endmodule
