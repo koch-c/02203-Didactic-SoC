@@ -55,17 +55,95 @@ module pixel_acc #(
   //
   // ============================================================
 
-  typedef enum logic [1:0] {
-    IDLE    = 2'b00,
-    PROCESS = 2'b01,
-    DRAIN   = 2'b10
+  typedef enum logic [2:0] {
+    IDLE     = 3'b000,
+    LOAD     = 3'b001,
+    COMPUTE  = 3'b010,
+    NEXT_ROW = 3'b011,
+    FINISH   = 3'b100
   } state_t;
 
-  state_t              state;
-  logic   [BUF_AW-1:0] rd_addr;
-  logic   [BUF_AW-1:0] wr_addr;
-  logic   [       6:0] count;
-  logic                count_reset;
+  state_t state;
+  state_t state_next;
+  logic [BUF_AW-1:0] rd_addr, rd_addr_next;
+  logic [BUF_AW-1:0] wr_addr, wr_addr_next;
+  logic [6:0] count;
+  logic       count_reset;
+
+  always_comb begin
+    // default values
+    state_next   = state;
+    rd_addr_next = rd_addr;
+    wr_addr_next = wr_addr;
+    ibuf_rd_en   = 1'b0;
+    obuf_wr_en   = 1'b0;
+    // obuf_wr_data = '0; <---------- this has to be connected to the computer
+    finish       = 1'b0;
+    count_reset  = 1'b0;
+
+    case (state)
+      IDLE: begin
+        if (start) begin
+          state_next   = LOAD;
+          rd_addr_next = '0;
+          wr_addr_next = IMG_WIDTH + 1;  // skip the first row and first column of the output
+        end
+      end
+      LOAD: begin
+        ibuf_rd_en   = 1'b1;
+        rd_addr_next = rd_addr + 1'b1;
+        if (rd_addr == IMG_WIDTH * 2 + 2) begin  // I think it is
+          count_reset = 1'b1;
+          state_next  = COMPUTE;
+        end
+      end
+      COMPUTE: begin
+        ibuf_rd_en   = 1'b1;
+        obuf_wr_en   = 1'b1;
+        rd_addr_next = rd_addr + 1'b1;
+        wr_addr_next = wr_addr + 1'b1;
+        if (wr_addr == BUF_DEPTH - IMG_WIDTH - 2) begin // to second last row and second last column of the output
+          state_next = FINISH;
+        end else begin
+          if (rd_addr == BUF_DEPTH) begin
+            rd_addr_next = 0;
+          end
+          if (count == IMG_WIDTH - 3) begin  // equivalent to 85
+            count_reset = 1'b1;
+            state_next  = NEXT_ROW;
+          end
+        end
+      end
+      NEXT_ROW: begin
+        ibuf_rd_en   = 1'b1;
+        rd_addr_next = rd_addr + 1'b1;
+        if (count == 1) begin
+          count_reset  = 1'b1;
+          state_next   = COMPUTE;
+          wr_addr_next = wr_addr + BUF_AW'(3);  // skip the first column of the output
+        end
+      end
+      FINISH: begin
+        finish = 1'b1;
+        state_next = IDLE;
+      end
+      default: begin
+        // Should not happen
+      end
+    endcase
+  end
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      state   <= IDLE;
+      rd_addr <= '0;
+      wr_addr <= '0;
+    end else begin
+      state   <= state_next;
+      rd_addr <= rd_addr_next;
+      wr_addr <= wr_addr_next;
+    end
+  end
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) count <= 7'd0;
