@@ -55,11 +55,11 @@ module pixel_acc #(
   localparam int COUNT_W = (IMG_WIDTH > 1) ? $clog2(IMG_WIDTH) : 1;
 
   typedef enum logic [2:0] {
-    IDLE         = 3'b000,
-    LOAD         = 3'b001,
-    COMPUTE      = 3'b010,
-    NEXT_ROW     = 3'b011,
-    FINISH       = 3'b100
+    IDLE     = 3'b000,
+    LOAD     = 3'b001,
+    COMPUTE  = 3'b010,
+    NEXT_ROW = 3'b011,
+    FINISH   = 3'b100
   } state_t;
 
   state_t state;
@@ -67,9 +67,9 @@ module pixel_acc #(
   logic [BUF_AW-1:0] rd_addr, rd_addr_next;
   logic [BUF_AW-1:0] wr_addr, wr_addr_next;
   logic [COUNT_W-1:0] count;
-  logic       count_reset;
-  logic       ibuf_data_valid;
-  logic       datapath_clear;
+  logic               count_reset;
+  logic               ibuf_data_valid;
+  logic               datapath_clear;
 
   sobel_datapath #(
       .IMG_W(IMG_WIDTH * 4),
@@ -85,25 +85,25 @@ module pixel_acc #(
 
   always_comb begin
     // default values
-    state_next    = state;
-    rd_addr_next  = rd_addr;
-    wr_addr_next  = wr_addr;
-    ibuf_rd_en    = 1'b0;
-    obuf_wr_en    = 1'b0;
-    finish        = 1'b0;
-    count_reset   = 1'b0;
+    state_next     = state;
+    rd_addr_next   = rd_addr;
+    wr_addr_next   = wr_addr;
+    ibuf_rd_en     = 1'b0;
+    obuf_wr_en     = 1'b0;
+    finish         = 1'b0;
+    count_reset    = 1'b0;
     datapath_clear = 1'b0;
-    ibuf_rd_addr  = rd_addr;
-    obuf_wr_addr  = wr_addr;
+    ibuf_rd_addr   = rd_addr;
+    obuf_wr_addr   = wr_addr;
 
 
     case (state)
       IDLE: begin
         if (start) begin
-          state_next   = LOAD;
+          state_next = LOAD;
           rd_addr_next = '0;
           wr_addr_next = BUF_AW'(IMG_WIDTH + 1);  // skip the first row and first word column
-          count_reset  = 1'b1;
+          count_reset = 1'b1;
           datapath_clear = 1'b1;
         end
       end
@@ -115,9 +115,9 @@ module pixel_acc #(
         end
       end
       COMPUTE: begin
-        ibuf_rd_en    = 1'b1;
-        obuf_wr_en    = 1'b1;
-        wr_addr_next  = wr_addr + 1'b1;
+        ibuf_rd_en   = 1'b1;
+        obuf_wr_en   = 1'b1;
+        wr_addr_next = wr_addr + 1'b1;
         if (wr_addr == BUF_AW'(BUF_DEPTH - IMG_WIDTH - 2)) begin
           state_next = FINISH;
         end else begin
