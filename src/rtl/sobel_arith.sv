@@ -22,6 +22,7 @@ module sobel_arith(
     // 11 bit for calculations
     logic signed [10:0] dx;
     logic signed [10:0] dy;
+    logic signed [10:0] corner_a, corner_b;
     logic        [10:0] abs_d;
     
     logic signed [10:0] p11, p12, p13;
@@ -44,11 +45,11 @@ module sobel_arith(
     // logic [20:0] x, t, scaled;
     
     always_comb begin
-        dx = p13 - p11 + ((p23 - p21) << 1) + p33 - p31;
-        dy = p11 - p31 + ((p12 - p32) << 1) + p13 - p33;
-        
-        /*dx = p13 - p11 + ((p23 - p21) << 1) + p33 - p31;
-        dy = p11 - p31 + ((p12 - p32) << 1) + p13 - p33;*/
+        // Both gradients reuse the same two corner differences.
+        corner_a = p13 - p31;
+        corner_b = p11 - p33;
+        dx = corner_a - corner_b + ((p23 - p21) << 1);
+        dy = corner_a + corner_b + ((p12 - p32) << 1);
     
         abs_d = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy); // abs(d) = abs(dx) + abs(dy)
     
