@@ -52,13 +52,10 @@ module pixel_acc #(
   // next rising edge, before that edge advances the datapath window.
   // ============================================================
 
-  localparam int COUNT_W = (IMG_WIDTH > 1) ? $clog2(IMG_WIDTH) : 1;
-
   typedef enum logic [2:0] {
     IDLE     = 3'b000,
     LOAD     = 3'b001,
     COMPUTE  = 3'b010,
-    NEXT_ROW = 3'b011,
     FINISH   = 3'b100
   } state_t;
 
@@ -66,8 +63,6 @@ module pixel_acc #(
   state_t state_next;
   logic [BUF_AW-1:0] rd_addr, rd_addr_next;
   logic [BUF_AW-1:0] wr_addr, wr_addr_next;
-  logic [COUNT_W-1:0] count;
-  logic               count_reset;
   logic               ibuf_data_valid;
   logic               datapath_clear;
 
@@ -91,7 +86,6 @@ module pixel_acc #(
     ibuf_rd_en     = 1'b0;
     obuf_wr_en     = 1'b0;
     finish         = 1'b0;
-    count_reset    = 1'b0;
     datapath_clear = 1'b0;
     ibuf_rd_addr   = rd_addr;
     obuf_wr_addr   = wr_addr;
@@ -102,15 +96,13 @@ module pixel_acc #(
         if (start) begin
           state_next = LOAD;
           rd_addr_next = '0;
-          wr_addr_next = BUF_AW'(IMG_WIDTH + 1);  // skip the first row and first word column
-          count_reset = 1'b1;
+          wr_addr_next = BUF_AW'(IMG_WIDTH);  // skip only the first row
           datapath_clear = 1'b1;
         end
       end
       LOAD: begin
         ibuf_rd_en = 1'b1;
-        if (rd_addr == BUF_AW'(IMG_WIDTH * 2 + 3)) begin
-          count_reset = 1'b1;
+        if (rd_addr == BUF_AW'(IMG_WIDTH * 2 + 2)) begin
           state_next  = COMPUTE;
         end
       end
@@ -118,21 +110,8 @@ module pixel_acc #(
         ibuf_rd_en   = 1'b1;
         obuf_wr_en   = 1'b1;
         wr_addr_next = wr_addr + 1'b1;
-        if (wr_addr == BUF_AW'(BUF_DEPTH - IMG_WIDTH - 2)) begin
+        if (wr_addr == BUF_AW'(BUF_DEPTH - IMG_WIDTH - 1)) begin
           state_next = FINISH;
-        end else begin
-          if (count == COUNT_W'(IMG_WIDTH - 3)) begin  // 86 writes: counts 0 through 85
-            count_reset = 1'b1;
-            state_next  = NEXT_ROW;
-          end
-        end
-      end
-      NEXT_ROW: begin
-        ibuf_rd_en = 1'b1;
-        if (count == 1) begin
-          count_reset  = 1'b1;
-          state_next   = COMPUTE;
-          wr_addr_next = wr_addr + BUF_AW'(2);  // skip the right and next left word borders
         end
       end
       FINISH: begin
@@ -163,12 +142,6 @@ module pixel_acc #(
       wr_addr         <= wr_addr_next;
       ibuf_data_valid <= datapath_clear ? 1'b0 : ibuf_rd_en;
     end
-  end
-
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) count <= '0;
-    else if (count_reset) count <= '0;
-    else count <= count + 1'b1;
   end
 
 
