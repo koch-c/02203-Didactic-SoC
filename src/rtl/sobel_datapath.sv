@@ -15,11 +15,16 @@ module sobel_datapath #(
     // The leftmost pixel is in bits [7:0].
     localparam int ROW_WORDS = IMG_W / 4;
     localparam int DEPTH = 2 * ROW_WORDS + 3;
-    localparam int WARMUP = 2 * ROW_WORDS + 2;
+    // The first output row needs only rows 0 and 1; its top is replicated.
+    localparam int WARMUP = ROW_WORDS + 2;
 
     localparam int FILL_W = $clog2(WARMUP + 1);
     localparam int COL_W = $clog2(ROW_WORDS);
     localparam int ROW_W = $clog2(IMG_H + 1);
+
+    logic [FILL_W - 1 : 0] fill_count;
+    logic [COL_W  - 1 : 0] center_col;
+    logic [ROW_W  - 1 : 0] center_row;
 
     // ----------------------------------------
     // Shift register
@@ -65,24 +70,30 @@ module sobel_datapath #(
     logic [47:0] top_strip;
     logic [47:0] mid_strip;
     logic [47:0] bot_strip;
+    logic [47:0] effective_top, effective_bot;
 
+    // Replicate each row's edge pixel instead of using a cross-row neighbor.
     assign top_strip = {
-        top_right[7:0],
+        (center_col == ROW_WORDS - 1) ? top_center[31:24] : top_right[7:0],
         top_center,
-        top_left[31:24]
+        (center_col == 0) ? top_center[7:0] : top_left[31:24]
     };
 
     assign mid_strip = {
-        mid_right[7:0],
+        (center_col == ROW_WORDS - 1) ? mid_center[31:24] : mid_right[7:0],
         mid_center,
-        mid_left[31:24]
+        (center_col == 0) ? mid_center[7:0] : mid_left[31:24]
     };
 
     assign bot_strip = {
-        bot_right[7:0],
+        (center_col == ROW_WORDS - 1) ? bot_center[31:24] : bot_right[7:0],
         bot_center,
-        bot_left[31:24]
+        (center_col == 0) ? bot_center[7:0] : bot_left[31:24]
     };
+
+    // Replicate the nearest row above/below the image, including its corners.
+    assign effective_top = (center_row == 0) ? mid_strip : top_strip;
+    assign effective_bot = (center_row == IMG_H - 1) ? mid_strip : bot_strip;
 
     // ----------------------------------------
     // Four parallel Sobel modules
@@ -93,16 +104,16 @@ module sobel_datapath #(
     for (genvar j = 0; j < 4; j++) begin : g_sobel
 
         sobel_arith u_sobel (
-            .s11(top_strip[(j + 0) * 8 +: 8]),
-            .s12(top_strip[(j + 1) * 8 +: 8]),
-            .s13(top_strip[(j + 2) * 8 +: 8]),
+            .s11(effective_top[(j + 0) * 8 +: 8]),
+            .s12(effective_top[(j + 1) * 8 +: 8]),
+            .s13(effective_top[(j + 2) * 8 +: 8]),
 
             .s21(mid_strip[(j + 0) * 8 +: 8]),
             .s23(mid_strip[(j + 2) * 8 +: 8]),
 
-            .s31(bot_strip[(j + 0) * 8 +: 8]),
-            .s32(bot_strip[(j + 1) * 8 +: 8]),
-            .s33(bot_strip[(j + 2) * 8 +: 8]),
+            .s31(effective_bot[(j + 0) * 8 +: 8]),
+            .s32(effective_bot[(j + 1) * 8 +: 8]),
+            .s33(effective_bot[(j + 2) * 8 +: 8]),
 
             .s_out(result[j])
         );
@@ -113,22 +124,18 @@ module sobel_datapath #(
     // Track the current output position
     // ----------------------------------------
 
-    logic [FILL_W - 1 : 0] fill_count;
-    logic [COL_W  - 1 : 0] center_col;
-    logic [ROW_W  - 1 : 0] center_row;
-
     always_ff @(posedge clk or negedge rst_n) begin
 
         if (!rst_n) begin
             fill_count <= '0;
             center_col <= '0;
-            center_row <= ROW_W'(1);
+            center_row <= '0;
         end
 
         else if (clear) begin
             fill_count <= '0;
             center_col <= '0;
-            center_row <= ROW_W'(1);
+            center_row <= '0;
         end
 
         else if (en) begin
@@ -156,35 +163,12 @@ module sobel_datapath #(
     // Pack four Sobel results into one word
     // ----------------------------------------
 
-    always_comb begin
-
-        out = {
-            result[3],
-            result[2],
-            result[1],
-            result[0]
-        };
-
-        // The window is not ready, or we are past the last interior image row.
-        if (fill_count < WARMUP ||
-            center_row >= IMG_H - 1) begin
-
-            out = 32'd0;
-
-        end
-
-        else begin
-
-            // First pixel of an image row
-            if (center_col == 0)
-                out[7:0] = 8'd0;
-
-            // Last pixel of an image row
-            if (center_col == ROW_WORDS - 1)
-                out[31:24] = 8'd0;
-
-        end
-
-    end
+    // The FSM enables writes only when the window contains a valid result.
+    assign out = {
+        result[3],
+        result[2],
+        result[1],
+        result[0]
+    };
 
 endmodule

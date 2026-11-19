@@ -96,13 +96,13 @@ module pixel_acc #(
         if (start) begin
           state_next = LOAD;
           rd_addr_next = '0;
-          wr_addr_next = BUF_AW'(IMG_WIDTH);  // skip only the first row
+          wr_addr_next = '0;  // write every row, including replicated boundaries
           datapath_clear = 1'b1;
         end
       end
       LOAD: begin
         ibuf_rd_en = 1'b1;
-        if (rd_addr == BUF_AW'(IMG_WIDTH * 2 + 2)) begin
+        if (rd_addr == BUF_AW'(IMG_WIDTH + 2)) begin
           state_next  = COMPUTE;
         end
       end
@@ -110,7 +110,7 @@ module pixel_acc #(
         ibuf_rd_en   = 1'b1;
         obuf_wr_en   = 1'b1;
         wr_addr_next = wr_addr + 1'b1;
-        if (wr_addr == BUF_AW'(BUF_DEPTH - IMG_WIDTH - 1)) begin
+        if (wr_addr == BUF_AW'(BUF_DEPTH - 1)) begin
           state_next = FINISH;
         end
       end
@@ -124,6 +124,8 @@ module pixel_acc #(
     endcase
 
     // All reading states share the same sequential, wrapping address stream.
+    // Wrapped reads flush the last output row; its bottom taps are replaced
+    // by the middle row in the datapath, so wrapped data cannot affect it.
     if (ibuf_rd_en) begin
       if (rd_addr == BUF_AW'(BUF_DEPTH - 1)) rd_addr_next = '0;
       else rd_addr_next = rd_addr + 1'b1;
