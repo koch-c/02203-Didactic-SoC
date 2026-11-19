@@ -80,7 +80,6 @@ module pixel_acc #(
   );
 
   always_comb begin
-    // default values
     state_next     = state;
     rd_addr_next   = rd_addr;
     wr_addr_next   = wr_addr;
@@ -97,7 +96,7 @@ module pixel_acc #(
         if (start) begin
           state_next = LOAD;
           rd_addr_next = '0;
-          wr_addr_next = '0;  // write every row, including replicated boundaries
+          wr_addr_next = '0;
           datapath_clear = 1'b1;
         end
       end
@@ -124,9 +123,6 @@ module pixel_acc #(
       end
     endcase
 
-    // All reading states share the same sequential, wrapping address stream.
-    // Wrapped reads flush the last output row; its bottom taps are replaced
-    // by the middle row in the datapath, so wrapped data cannot affect it.
     if (ibuf_rd_en) begin
       if (rd_addr == BUF_AW'(BUF_DEPTH - 1)) rd_addr_next = '0;
       else rd_addr_next = rd_addr + 1'b1;
