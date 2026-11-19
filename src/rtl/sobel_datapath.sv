@@ -8,6 +8,7 @@ module sobel_datapath #(
     input  logic        clear,
     input  logic        clk,
     input  logic        en,
+    input  logic        compute,
     input  logic [31:0] in,
     output logic [31:0] out
 );
@@ -15,14 +16,9 @@ module sobel_datapath #(
     // The leftmost pixel is in bits [7:0].
     localparam int ROW_WORDS = IMG_W / 4;
     localparam int DEPTH = 2 * ROW_WORDS + 3;
-    // The first output row needs only rows 0 and 1; its top is replicated.
-    localparam int WARMUP = ROW_WORDS + 2;
-
-    localparam int FILL_W = $clog2(WARMUP + 1);
     localparam int COL_W = $clog2(ROW_WORDS);
     localparam int ROW_W = $clog2(IMG_H + 1);
 
-    logic [FILL_W - 1 : 0] fill_count;
     logic [COL_W  - 1 : 0] center_col;
     logic [ROW_W  - 1 : 0] center_row;
 
@@ -127,24 +123,19 @@ module sobel_datapath #(
     always_ff @(posedge clk or negedge rst_n) begin
 
         if (!rst_n) begin
-            fill_count <= '0;
             center_col <= '0;
             center_row <= '0;
         end
 
         else if (clear) begin
-            fill_count <= '0;
             center_col <= '0;
             center_row <= '0;
         end
 
-        else if (en) begin
+        // LOAD fills history without advancing the output position.
+        else if (en && compute) begin
 
-            if (fill_count < WARMUP) begin
-                fill_count <= fill_count + 1'b1;
-            end
-
-            else if (center_col == ROW_WORDS-1) begin
+            if (center_col == ROW_WORDS-1) begin
                 center_col <= '0;
 
                 if (center_row < IMG_H)

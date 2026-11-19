@@ -74,6 +74,7 @@ module pixel_acc #(
       .rst_n(rst_n),
       .clear(datapath_clear),
       .en(ibuf_data_valid),
+      .compute(state == COMPUTE),
       .in(ibuf_rd_data),
       .out(obuf_wr_data)
   );
