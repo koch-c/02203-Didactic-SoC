@@ -53,18 +53,18 @@ module pixel_acc #(
   // ============================================================
 
   typedef enum logic [2:0] {
-    IDLE     = 3'b000,
-    LOAD     = 3'b001,
-    COMPUTE  = 3'b010,
-    FINISH   = 3'b100
+    IDLE    = 3'b000,
+    LOAD    = 3'b001,
+    COMPUTE = 3'b010,
+    FINISH  = 3'b100
   } state_t;
 
   state_t state;
   state_t state_next;
   logic [BUF_AW-1:0] rd_addr, rd_addr_next;
   logic [BUF_AW-1:0] wr_addr, wr_addr_next;
-  logic               ibuf_data_valid;
-  logic               datapath_clear;
+  logic ibuf_data_valid;
+  logic datapath_clear;
 
   sobel_datapath #(
       .IMG_W(IMG_WIDTH * 4),
@@ -104,7 +104,7 @@ module pixel_acc #(
       LOAD: begin
         ibuf_rd_en = 1'b1;
         if (rd_addr == BUF_AW'(IMG_WIDTH + 2)) begin
-          state_next  = COMPUTE;
+          state_next = COMPUTE;
         end
       end
       COMPUTE: begin
