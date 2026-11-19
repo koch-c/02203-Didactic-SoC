@@ -121,7 +121,6 @@ module sobel_datapath #(
   // ----------------------------------------
 
   always_ff @(posedge clk or negedge rst_n) begin
-
     if (!rst_n) begin
       center_col <= '0;
       center_row <= '0;
@@ -130,17 +129,13 @@ module sobel_datapath #(
       center_row <= '0;
     end  // LOAD fills history without advancing the output position.
     else if (en && compute) begin
-
       if (center_col == ROW_WORDS - 1) begin
         center_col <= '0;
-
-        if (center_row < IMG_H) center_row <= center_row + 1'b1;
+        center_row <= center_row + 1'b1;
       end else begin
         center_col <= center_col + 1'b1;
       end
-
     end
-
   end
 
   // ----------------------------------------
