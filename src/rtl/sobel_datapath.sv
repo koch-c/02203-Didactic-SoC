@@ -32,8 +32,6 @@ module sobel_datapath #(
       .DEPTH(DEPTH)
   ) u_shift (
       .clk(clk),
-      .rst_n(rst_n),
-      .clear(clear),
       .en(en),
       .in(in),
       .out(history)
@@ -68,6 +66,7 @@ module sobel_datapath #(
   logic [47:0] bot_strip;
 
   // Replicate horizontal edge pixels and use the middle strip for missing rows.
+  // On the first row, this also masks the top history taps before they refill.
   assign top_strip = (center_row == 0) ? mid_strip : {
     (center_col == ROW_WORDS - 1) ? top_center[31:24] : top_right[7:0],
     top_center,
